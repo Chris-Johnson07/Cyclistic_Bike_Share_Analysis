@@ -32,6 +32,7 @@ alltrips <- rbind(may2023,
 
 #adding column to show the length of each ride
 alltrips$ride_length <- alltrips$ended_at-alltrips$started_at
+alltrips$ride_length <- as.difftime(alltrips$ride_length, units = 'mins')
 
 #adding column to show which day of the week each ride was on
 alltrips$day_of_week <- as.Date(alltrips$started_at)
@@ -76,6 +77,26 @@ aggregate(alltripsV2$ride_length,list(alltripsV2$member_casual), FUN=mean)
 aggregate(alltripsV2$ride_length,list(alltripsV2$member_casual), FUN=median)
 aggregate(alltripsV2$ride_length,list(alltripsV2$member_casual), FUN=max)
 aggregate(alltripsV2$ride_length,list(alltripsV2$member_casual), FUN=min)
+#note the maximum ride lengths indicate errors with some rides lasting several days
+
+#Let's remove rides greater than 3 hours
+alltripsV2 <- alltripsV2[!(alltripsV2$ride_length > 10800),]
+
+#now let's reinspect ride length characteristics by member/casual rider
+aggregate(alltripsV2$ride_length,list(alltripsV2$member_casual), FUN=mean)
+aggregate(alltripsV2$ride_length,list(alltripsV2$member_casual), FUN=median)
+aggregate(alltripsV2$ride_length,list(alltripsV2$member_casual), FUN=max)
+aggregate(alltripsV2$ride_length,list(alltripsV2$member_casual), FUN=min)
+
+
+
+
+
+
+
+
+
+
 
 #order day of week column
 alltripsV2$day_of_week <- ordered(alltripsV2$day_of_week, levels = 
@@ -116,6 +137,25 @@ alltripsV2 %>% mutate(weekday = alltripsV2$day_of_week) %>%
   labs(x = 'Day of the Week',y = 'Average Duration in Minutes')
 ggsave("average_duration.png")
 
+
+
+
+
+alltripsV2 %>% group_by(member_casual, start_hour) %>% 
+  summarise(number_of_rides = n()) %>% 
+  arrange(member_casual, start_hour) %>% 
+  ggplot(aes(x = start_hour, y = number_of_rides, group = member_casual)) +
+  geom_line(aes(color = member_casual)) +
+  geom_point(aes(color = member_casual)) +
+  labs(x = 'Hour of the Day', y = 'Number of Rides')
+
+
+
+
+
+
+
+
 #visualization of the type of bike used by member/casual riders
 alltripsV2[alltripsV2$member_casual == 'member',] %>% group_by(rideable_type) %>% 
   summarise(perc = n()/nrow(alltripsV2[alltripsV2$member_casual == 'member',])*100) %>% 
@@ -149,6 +189,9 @@ str(alltripsV2)
 table(alltripsV2$start_hour)
 
 #let's visualize the number of rides started for each hour of the day
+#here we can see member riders have a trend. A peak at 8am and a peak at 5pm
+#this is consistent with a typical 8am-5pm workday indicating some members ride
+#to and from work. Casual riders show a partial similar trend to this at 5pm.
 alltripsV2 %>% group_by(member_casual, start_hour) %>% 
   summarise(number_of_rides = n()) %>% 
   arrange(member_casual, start_hour) %>% 
@@ -159,6 +202,8 @@ alltripsV2 %>% group_by(member_casual, start_hour) %>%
 ggsave("rides_by_the_hour")
 
 #let's visualize number of rides for each month by member/casual riders
+#here we can see both members and casual riders prefer riding during warmer
+#months and peak during summer months.
 alltripsV2$month <- as.POSIXct(alltripsV2$started_at)
 str(alltripsV2)
 
@@ -182,9 +227,30 @@ table(alltripsV2$month[alltripsV2$member_casual == 'casual'])
 #Note: june+july+august = 1134007 rides (49%)
 #Note: all other months = 1178010 rides (51%)
 
+#if we visualize this we can see that half of all casual rides are made during the
+#three summer months; June, July, and August
+alltripsV2$season <- with(alltripsV2, ifelse(month %in% c('Dec', 'Jan', 'Feb'), 'Winter',
+                                             ifelse(month %in% c('Mar','Apr','May'), 'Spring',
+                                                    ifelse(month %in% c('Jun','Jul','Aug'), 'Summer',
+                                                           'Fall'))))
+
+alltripsV2[alltripsV2$member_casual == 'casual',] %>% group_by(season) %>% 
+  summarise(perc = n()/nrow(alltripsV2[alltripsV2$member_casual == 'casual',])*100) %>% 
+  arrange(desc(season)) %>%
+  mutate(ypos = cumsum(perc)-0.5*perc) %>% 
+  ggplot(aes(x='',y=perc,fill=season)) +
+  geom_bar(stat='identity',width=2,color='black') +
+  coord_polar('y',start=0) +
+  scale_fill_manual(values = c("#BE2A3E", "#EC754A",
+                               "#EACF65", "#3C8D53")) +
+  theme_void() +
+  geom_text(aes(y=ypos,label=paste(round(perc,1),'%'))) +
+  labs(title = 'Casual Rides by Season')
+
 #now let's look at number of rides casual riders take on weekends
 table(alltripsV2$day_of_week[alltripsV2$member_casual == 'casual'])
-#Note: Saturday + Sunday = 831439
+#Note: Saturday + Sunday = 831439 (36% of total casual rides)
 
 #now let's look at number of rides casual riders take before and after work hours
 table(alltripsV2$start_hour[alltripsV2$member_casual == 'casual' & alltripsV2$day_of_week != 'Sunday' & alltripsV2$day_of_week != 'Saturday'])
+#Note: rides at 8am and 5pm = 216141 (9% of total casual rides)
