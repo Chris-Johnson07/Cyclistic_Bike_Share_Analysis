@@ -1,7 +1,4 @@
 ---
-editor_options:
-  markdown:
-    wrap: 72
 output:
   pdf_document: default
   html_document:
@@ -174,7 +171,7 @@ alltrips$day_of_week <- format(as.Date(alltrips$day_of_week),'%A')
 alltrips <- subset(alltrips, select = -c(start_lat, start_lng, end_lat, end_lng))
 
 #inspecting alltrips data frame for irregularities or inconsistencies
-str(alltrips)
+print(str(alltrips))
 
 ```
 
