@@ -55,6 +55,9 @@ table(alltrips$rideable_type)
 
 #now inspecting rideable_type dispersion by member/casual rider
 table(alltrips$member_casual,alltrips$rideable_type)
+#Note: there are no observations for docked_bikes for members
+#Note: members show an equal share of rides for classic and electric bikes while
+#casual riders prefer electric bikes 
 
 #inspecting ride_length column
 mean(alltrips$ride_length) #average ride length
@@ -65,6 +68,9 @@ min(alltrips$ride_length) #shortest ride
 
 #duplicating alltrips dataframe but removing ride lengths less than 0 secs
 alltripsV2 <- alltrips[!(alltrips$ride_length < 0),]
+
+#changing ride_length from seconds to minutes
+units(alltripsV2$ride_length) <- "mins"
 
 #inspecting ride_length column from new dataframe
 mean(alltripsV2$ride_length) #average ride length
@@ -80,23 +86,15 @@ aggregate(alltripsV2$ride_length,list(alltripsV2$member_casual), FUN=min)
 #note the maximum ride lengths indicate errors with some rides lasting several days
 
 #Let's remove rides greater than 3 hours
-alltripsV2 <- alltripsV2[!(alltripsV2$ride_length > 10800),]
+alltripsV2 <- alltripsV2[!(alltripsV2$ride_length > 180),]
+#Note: by now we have removed 19,327 observations from our original dataframe
+# amounting to 0.3% of total observations removed
 
 #now let's reinspect ride length characteristics by member/casual rider
 aggregate(alltripsV2$ride_length,list(alltripsV2$member_casual), FUN=mean)
 aggregate(alltripsV2$ride_length,list(alltripsV2$member_casual), FUN=median)
 aggregate(alltripsV2$ride_length,list(alltripsV2$member_casual), FUN=max)
 aggregate(alltripsV2$ride_length,list(alltripsV2$member_casual), FUN=min)
-
-
-
-
-
-
-
-
-
-
 
 #order day of week column
 alltripsV2$day_of_week <- ordered(alltripsV2$day_of_week, levels = 
@@ -106,6 +104,7 @@ table(alltripsV2$day_of_week)
 
 #inspecting number of rides by member/casual then by day of week
 table(alltripsV2$member_casual, alltripsV2$day_of_week)
+#Note: while members tend to favor weekday rides, casual riders tend to favor weekends
 
 #average ride length by member/casual rider then by day of the week
 aggregate(alltripsV2$ride_length ~ alltripsV2$member_casual + 
@@ -130,31 +129,12 @@ ggsave('number_of_rides.png')
 #visualization of average ride length by member/casual riders and by day of the week
 alltripsV2 %>% mutate(weekday = alltripsV2$day_of_week) %>% 
   group_by(member_casual, weekday) %>% 
-  summarise(average_duration_in_minutes = mean(ride_length)/60) %>% 
+  summarise(average_duration_in_minutes = mean(ride_length)) %>% 
   arrange(member_casual, weekday) %>% 
   ggplot(aes(x = weekday, y = average_duration_in_minutes, fill = member_casual)) + 
   geom_col(position = 'dodge') +
   labs(x = 'Day of the Week',y = 'Average Duration in Minutes')
 ggsave("average_duration.png")
-
-
-
-
-
-alltripsV2 %>% group_by(member_casual, start_hour) %>% 
-  summarise(number_of_rides = n()) %>% 
-  arrange(member_casual, start_hour) %>% 
-  ggplot(aes(x = start_hour, y = number_of_rides, group = member_casual)) +
-  geom_line(aes(color = member_casual)) +
-  geom_point(aes(color = member_casual)) +
-  labs(x = 'Hour of the Day', y = 'Number of Rides')
-
-
-
-
-
-
-
 
 #visualization of the type of bike used by member/casual riders
 alltripsV2[alltripsV2$member_casual == 'member',] %>% group_by(rideable_type) %>% 
@@ -221,36 +201,50 @@ alltripsV2 %>% group_by(member_casual,month) %>%
   geom_point(aes(color = member_casual)) +
   labs(x = 'Month', y = 'Number of Rides')
 
-#now that we've inspected our data we can start finding the areas with the most opportunity
-#lets first look at casual riders during the warm months
-table(alltripsV2$month[alltripsV2$member_casual == 'casual'])
-#Note: june+july+august = 1134007 rides (49%)
-#Note: all other months = 1178010 rides (51%)
+#now that we've inspected our data we can start answering our question: "How do annual
+#members and casual riders differ?"
+#From our research I found two major areas members and casual riders differ:
+#- Days of the week
+#- Bike type
 
-#if we visualize this we can see that half of all casual rides are made during the
-#three summer months; June, July, and August
-alltripsV2$season <- with(alltripsV2, ifelse(month %in% c('Dec', 'Jan', 'Feb'), 'Winter',
-                                             ifelse(month %in% c('Mar','Apr','May'), 'Spring',
-                                                    ifelse(month %in% c('Jun','Jul','Aug'), 'Summer',
-                                                           'Fall'))))
+#When we looked at days of the week, there is a clear difference in number of total rides
+# between annual members and casual riders. While annual members prefer weekdays,
+# casual members tend to prefer weekends
+alltripsV2 %>% mutate(weekday = alltripsV2$day_of_week) %>% 
+  group_by(member_casual, weekday) %>% 
+  summarise(number_of_rides = n()) %>% 
+  arrange(member_casual, weekday) %>% 
+  ggplot(aes(x = weekday, y = number_of_rides, fill = member_casual)) +
+  geom_col(position = 'dodge') +
+  labs(x = 'Day of the Week',y = 'Number of Rides')
 
-alltripsV2[alltripsV2$member_casual == 'casual',] %>% group_by(season) %>% 
-  summarise(perc = n()/nrow(alltripsV2[alltripsV2$member_casual == 'casual',])*100) %>% 
-  arrange(desc(season)) %>%
+
+#When we looked at types of bikes members and casual riders preferred, we saw a clear
+# difference between. While annual members showed 0 observations for Docked Bikes and
+# an even split of rides between classic bikes and electric bikes, Casual members
+# showed a significant amount of rides for docked bikes (6% of total rides), a decrease in classic bikes,
+# and an increase in electric bikes.
+table(alltrips$member_casual,alltrips$rideable_type)
+
+#visualization of the type of bike used by member/casual riders
+alltripsV2[alltripsV2$member_casual == 'member',] %>% group_by(rideable_type) %>% 
+  summarise(perc = n()/nrow(alltripsV2[alltripsV2$member_casual == 'member',])*100) %>% 
+  arrange(desc(rideable_type)) %>% 
   mutate(ypos = cumsum(perc)-0.5*perc) %>% 
-  ggplot(aes(x='',y=perc,fill=season)) +
-  geom_bar(stat='identity',width=2,color='black') +
+  ggplot(aes(x='',y=perc,fill=rideable_type)) +
+  geom_bar(stat='identity',width=1,color='white') +
   coord_polar('y',start=0) +
-  scale_fill_manual(values = c("#BE2A3E", "#EC754A",
-                               "#EACF65", "#3C8D53")) +
   theme_void() +
   geom_text(aes(y=ypos,label=paste(round(perc,1),'%'))) +
-  labs(title = 'Casual Rides by Season')
+  labs(title = 'Bike Type Dispersion for Members')
 
-#now let's look at number of rides casual riders take on weekends
-table(alltripsV2$day_of_week[alltripsV2$member_casual == 'casual'])
-#Note: Saturday + Sunday = 831439 (36% of total casual rides)
-
-#now let's look at number of rides casual riders take before and after work hours
-table(alltripsV2$start_hour[alltripsV2$member_casual == 'casual' & alltripsV2$day_of_week != 'Sunday' & alltripsV2$day_of_week != 'Saturday'])
-#Note: rides at 8am and 5pm = 216141 (9% of total casual rides)
+alltripsV2[alltripsV2$member_casual == 'casual',] %>% group_by(rideable_type) %>% 
+  summarise(perc = n()/nrow(alltripsV2[alltripsV2$member_casual == 'casual',])*100) %>% 
+  arrange(desc(rideable_type)) %>% 
+  mutate(ypos = cumsum(perc)-0.5*perc) %>% 
+  ggplot(aes(x='',y=perc,fill=rideable_type)) +
+  geom_bar(stat='identity',width=1,color='white') +
+  coord_polar('y',start=0) +
+  theme_void() +
+  geom_text(aes(y=ypos,label=paste(round(perc,1),'%'))) +
+  labs(title = 'Bike Type Dispersion for Casual Riders')
