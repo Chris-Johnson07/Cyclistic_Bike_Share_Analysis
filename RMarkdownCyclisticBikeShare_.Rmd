@@ -1,7 +1,4 @@
 ---
-title: "Untitled"
-author: "Chris Johnson"
-date: "2025-08-10"
 output: html_document
 ---
 
@@ -238,6 +235,148 @@ alltripsV2 %>% mutate(weekday = wday(started_at, label = TRUE)) %>%
   summarise(number_of_rides = n(), average_duration = mean(ride_length)) %>% 
   arrange(member_casual, weekday)
 ```
+
+```{r message=FALSE}
+#visualization of number of rides by member/casual riders and by day of the week
+alltripsV2 %>% mutate(weekday = alltripsV2$day_of_week) %>% 
+  group_by(member_casual, weekday) %>% 
+  summarise(number_of_rides = n()) %>% 
+  arrange(member_casual, weekday) %>% 
+  ggplot(aes(x = weekday, y = number_of_rides, fill = member_casual)) +
+  geom_col(position = 'dodge') +
+  labs(x = 'Day of the Week',y = 'Number of Rides')
+```
+```{r message=FALSE}
+#visualization of average ride length by member/casual riders and by day of the week
+alltripsV2 %>% mutate(weekday = alltripsV2$day_of_week) %>% 
+  group_by(member_casual, weekday) %>% 
+  summarise(average_duration_in_minutes = mean(ride_length)) %>% 
+  arrange(member_casual, weekday) %>% 
+  ggplot(aes(x = weekday, y = average_duration_in_minutes, fill = member_casual)) + 
+  geom_col(position = 'dodge') +
+  labs(x = 'Day of the Week',y = 'Average Duration in Minutes')
+```
+```{r message=FALSE}
+#visualization of the type of bike used by member/casual riders
+alltripsV2[alltripsV2$member_casual == 'member',] %>% group_by(rideable_type) %>% 
+  summarise(perc = n()/nrow(alltripsV2[alltripsV2$member_casual == 'member',])*100) %>% 
+  arrange(desc(rideable_type)) %>% 
+  mutate(ypos = cumsum(perc)-0.5*perc) %>% 
+  ggplot(aes(x='',y=perc,fill=rideable_type)) +
+  geom_bar(stat='identity',width=1,color='white') +
+  coord_polar('y',start=0) +
+  theme_void() +
+  geom_text(aes(y=ypos,label=paste(round(perc,1),'%'))) +
+  labs(title = 'Bike Type Dispersion for Members')
+
+alltripsV2[alltripsV2$member_casual == 'casual',] %>% group_by(rideable_type) %>% 
+  summarise(perc = n()/nrow(alltripsV2[alltripsV2$member_casual == 'casual',])*100) %>% 
+  arrange(desc(rideable_type)) %>% 
+  mutate(ypos = cumsum(perc)-0.5*perc) %>% 
+  ggplot(aes(x='',y=perc,fill=rideable_type)) +
+  geom_bar(stat='identity',width=1,color='white') +
+  coord_polar('y',start=0) +
+  theme_void() +
+  geom_text(aes(y=ypos,label=paste(round(perc,1),'%'))) +
+  labs(title = 'Bike Type Dispersion for Casual Riders')
+```
+```{r message=FALSE}
+#now let's inspect the hours of the day riders start their trips at
+alltripsV2$start_hour <- as.POSIXct(alltripsV2$started_at)
+alltripsV2$start_hour <- format(alltripsV2$start_hour, format = '%H')
+
+table(alltripsV2$start_hour)
+```
+```{r message=FALSE}
+#let's visualize the number of rides started for each hour of the day
+#here we can see member riders have a trend. A peak at 8am and a peak at 5pm
+#this is consistent with a typical 8am-5pm workday indicating some members ride
+#to and from work. Casual riders show a partial similar trend to this at 5pm.
+alltripsV2 %>% group_by(member_casual, start_hour) %>% 
+  summarise(number_of_rides = n()) %>% 
+  arrange(member_casual, start_hour) %>% 
+  ggplot(aes(x = start_hour, y = number_of_rides, group = member_casual)) +
+  geom_line(aes(color = member_casual)) +
+  geom_point(aes(color = member_casual)) +
+  labs(x = 'Hour of the Day', y = 'Number of Rides')
+```
+```{r message=FALSE}
+#let's visualize number of rides for each month by member/casual riders
+#here we can see both members and casual riders prefer riding during warmer
+#months and peak during summer months.
+alltripsV2$month <- as.POSIXct(alltripsV2$started_at)
+alltripsV2$month <- format(alltripsV2$month, format = '%b')
+
+alltripsV2$month <- ordered(alltripsV2$month, levels = 
+                              c('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'))
+
+alltripsV2 %>% group_by(member_casual,month) %>% 
+  summarise(number_of_rides = n()) %>% 
+  arrange(member_casual,month) %>% 
+  ggplot(aes(x = month, y = number_of_rides, group = member_casual)) +
+  geom_line(aes(color = member_casual)) +
+  geom_point(aes(color = member_casual)) +
+  labs(x = 'Month', y = 'Number of Rides')
+```
+## Share
+
+In the **Share** step we communicate with our stakeholders our findings in presentation form whether that is on Powerpoint or some other presentation platform. Below you'll see a basic outline of a presentation with the findings made from the analysis and answers to the original project questions.
+
+**Overview**. The questions we want to answer are *"how do members and casual riders differ in their use of the company's bike share service"* and *"what are our recommendations based on our analysis."* In order to sufficiently answer these questions we first wanted to establish the validity and integrity of the data provided, we then want to comb through the dataset for any abnormalities, after which we will then show how the analysis process took place and finally explain what the analysis process found.
+
+**Presentation.** During a real presentation I would go over a lot of what has already been presented but also include the following analysis.
+
+**Analysis.** During our inspections we looked over various ways in which both annual members and casual riders use Cyclistic Bikes. To answer our questions, the areas we want to highlight are the bike types each type of rider uses and which days of the week each type of rider prefers.
+
+```{r message=FALSE}
+#When we looked at types of bikes members and casual riders preferred, we saw a clear
+# difference between them. While annual members showed 0 observations for Docked Bikes and
+# an even split of rides between classic bikes and electric bikes, Casual members
+# showed a significant amount of rides for docked bikes (6% of total rides), less rides on classic bikes,
+# and more rides on electric bikes.
+table(alltrips$member_casual,alltrips$rideable_type)
+
+#visualization of the type of bike used by member/casual riders
+alltripsV2[alltripsV2$member_casual == 'member',] %>% group_by(rideable_type) %>% 
+  summarise(perc = n()/nrow(alltripsV2[alltripsV2$member_casual == 'member',])*100) %>% 
+  arrange(desc(rideable_type)) %>% 
+  mutate(ypos = cumsum(perc)-0.5*perc) %>% 
+  ggplot(aes(x='',y=perc,fill=rideable_type)) +
+  geom_bar(stat='identity',width=1,color='white') +
+  coord_polar('y',start=0) +
+  theme_void() +
+  geom_text(aes(y=ypos,label=paste(round(perc,1),'%'))) +
+  labs(title = 'Bike Type Dispersion for Members')
+
+alltripsV2[alltripsV2$member_casual == 'casual',] %>% group_by(rideable_type) %>% 
+  summarise(perc = n()/nrow(alltripsV2[alltripsV2$member_casual == 'casual',])*100) %>% 
+  arrange(desc(rideable_type)) %>% 
+  mutate(ypos = cumsum(perc)-0.5*perc) %>% 
+  ggplot(aes(x='',y=perc,fill=rideable_type)) +
+  geom_bar(stat='identity',width=1,color='white') +
+  coord_polar('y',start=0) +
+  theme_void() +
+  geom_text(aes(y=ypos,label=paste(round(perc,1),'%'))) +
+  labs(title = 'Bike Type Dispersion for Casual Riders')
+```
+```{r message=FALSE}
+#When we looked at days of the week, there is a clear difference in number of total rides
+# between annual members and casual riders. While annual members prefer weekdays,
+# casual members tend to prefer weekends
+table(alltripsV2$member_casual, alltripsV2$day_of_week)
+
+alltripsV2 %>% mutate(weekday = alltripsV2$day_of_week) %>% 
+  group_by(member_casual, weekday) %>% 
+  summarise(number_of_rides = n()) %>% 
+  arrange(member_casual, weekday) %>% 
+  ggplot(aes(x = weekday, y = number_of_rides, fill = member_casual)) +
+  geom_col(position = 'dodge') +
+  labs(x = 'Day of the Week',y = 'Number of Rides')
+```
+
+
+
+Therefore we can say annual members and casual riders use Cyclistic Bikes differently in two major ways: In the type of bike they use, and in their preference of weekdays vs weekends.
 
 
 
